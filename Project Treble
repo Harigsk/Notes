@@ -1,0 +1,114 @@
+Project Treble
+Introduction:
+The Problem: The "Big Messy Tower"
+Before 2017 (Android 8.0): updating an Android phone was like trying to replace the bottom floor of a skyscraper without the whole building collapsing.
+The Old Way: The Android OS (the "house") and the Hardware Drivers (the "foundation") were tangled together.
+The Result: To update the OS, manufacturers had to rewrite huge chunks of hardware code. This took months, leading to "Android Fragmentation."
+
+
+The "Why" behind the Delay
+"Why was it so slow? It wasn't because Google was lazy. It was because the Architecture was a 'Monolithic Blob.'
+Before 2017, if you wanted to update the Android OS (the software), you had to manually stitch it into the Silicon (the hardware drivers). As our partners told us, updating a device was 'incredibly time-consuming and costly.
+The Android OS Framework developed by Google,
+The Vendor Implementation (drivers, HALs, low-level libraries) provided by OEMs,
+The Applications built by third parties.
+Historically, this coupling made OS updates slow and costly, as device makers had to re-integrate and test the entire software stack for each update.
+
+"It was like having to rebuild your entire car engine just because you wanted to change the radio software."
+What is PROJECT TREBLE
+Project Treble separates the Android OS Framework from the vendor hardware code implementations
+
+With Project Treble, Google is introducing a “vendor interface“, which will work similarly to the Compatibility Test Suite (CTS).
+
+The CTS makes sure the app developers don’t have to custom design their apps for different manufacturers and different hardware.
+
+In the case of Android updates, Vendor Test Suite (VTS) will cut off the work required by the silicon manufacturers, thus speeding up the update.
+HOW Android Updates work After Oreo 
+It’s important to reiterate that Android uses the Linux kernel under the hood.  A kernel is the part of an operating system which handles input/output and computer instructions from the application layer, essentially allowing the application software to communicate with the hardware.
+To make changes to the way Android handles this communication is to make some notable changes to the way the Linux kernel operates.
+To solve the hardware abstraction layer issue, Android 8.0 Oreo and later version like Android 9.0 Pie formalize the division between hardware subsystems like audio or camera, and their clients on the software side. These new formal divisions specify the interface between a HAL and its users.
+The goal of a HIDL is to allow the framework to be replaced without having to rebuild HALs. HALs will be built by vendors or SoC makers and put in a /vendor partition on the device, enabling the framework,
+in its own partition, to be replaced with an over-the-air update (OTA) without recompiling the HALs. To update devices running earlier versions of Android to Android O, developers can wrap both conventional and legacy HALs in a new HIDL interface too.
+ANDROID ARCHITECTURE PRE O           
+ANDROID ARCHITECTURE POST O 
+A more pertinent change was in enforcing a clear-cut "division of responsibilities" through what was to become the standard partitioning layout of all devices:
+
+/system — the system partition would now be exclusively comprised of AOSP code and thus become the responsibility of Google alone.
+/vendor — would be used for the BSP (Board Support Package) binaries and files. These include the hardware-specific components needed to interface with the SoC components, ie. the baseband, sensors, camera, etc. Despite the numerous device brands, there are only a few silicon vendors, such as Qualcomm, Samsung (Exynos), MediaTek, and UNISOC (formerly Spreadtrum)).
+/odm — would be used for files from the "Original Device Manufacturer", that is, the software vendor and brand of the device (e.g. Xiaomi, Samsung, OPPO, etc).
+/product — would be used for device-specific idiosyncrasies like, for example, the minor differences between a Pixel 6 and 6a.
+
+Life of an Android Release
+First, it's helpful to understand the "life of an Android release".
+
+Before Treble: The Relay Race (Sequential) 
+The Android team publishes the open-source code for the latest release to the world.
+Silicon manufacturers, the companies that make the chips that power Android devices, modify the new release for their specific hardware.
+Silicon manufacturers pass the modified new release to device makers — the companies that design and manufacture Android devices. Device makers modify the new release again as needed for their devices.
+Device makers work with carriers to test and certify the new release.
+Device makers and carriers make the new release available to users.
+With Project Treble: The "Express Lane" (Parallel)
+Because Treble created the Vendor Interface (that "Standard Baseplate" we talked about), the steps changed:
+Step 1 (Google): Publishes the code.
+The "Shortcut": Because of the Vendor Interface, Device Makers (Samsung) no longer have to wait for Silicon Makers (Qualcomm) to rewrite the drivers for every single OS version.
+The Result: Samsung can take the new Android code and "plug it in" to the existing Qualcomm drivers that are already on the phone.
+Why this is huge: It allows the Device Maker to start their work (Step 3) on Day 1, at the same time as the Silicon Maker.
+
+
+Android Version	Project Status	Release Date	Time to reach 10% Adoption	The "Update Experience"
+4.1 Jelly Bean	Pre-Treble	July 2012	~14 Months	The "Slow Crawl." Most phones died before ever seeing an update.
+5.0 Lollipop	Pre-Treble	Nov 2014	~12 Months	The "Material Design" delay. Huge UI changes made updates even slower.
+6.0 Marshmallow	Pre-Treble	Oct 2015	~11 Months	Slightly faster, but still required a full "re-bake" of the OS soup.
+7.0 Nougat	The Peak Crisis	Aug 2016	~10 Months	Google realized they had a massive problem. Only 1% were on Nougat after 5 months.
+8.0 Oreo	Treble Born	Aug 2017	~8 Months	The first "Split." Newer phones started moving faster.
+9.0 Pie	Post-Treble	Aug 2018	~5 Months	The "Express Lane." Massive jump in speed thanks to HIDL.
+10.0 Q	Mainline Born	Sept 2019	~4 Months	100 million devices reached faster than any version in history.
+11.0+	The New Normal	Sept 2020+	< 3 Months	Same-day Betas for Xiaomi, Oppo, and OnePlus.
+
+PROJECT MAINLINE:
+While Project Treble tackles the architecture of the OS, Project Mainline focuses on how Android delivers updates.
+Introduced in Android 10, The original goal behind Project Mainline was to improve the speed at which Android users receive security patches for critical system components.
+But it is also now used to roll out new Android features to users running different Android versions without needing them to apply a full OS update.
+
+HOW IT WORKS
+These Project Mainline modules, also called modular system components, are distributed in either the standard APK format or the Android Pony Express (APEX) format introduced in Android 10.
+Which format is used largely depends on how early in the boot process the component needs to be initialized, as APEX modules can be used much earlier in the boot process than APK-based modules can.
+The APK format is also less flexible when it comes to system modules, as it is primarily designed for Android apps.
+APEX files can contain native shared libraries, native executables, JAR files, data files, config files, and yes, even APKs.
+APK (The Standard): Used for apps like YouTube. These load after the phone has fully started.
+APEX (The Super-Package): Introduced for Project Mainline.
+Why APEX? Core parts of the phone ( like the ART Runtime or DNS Resolver) need to start during the Boot Sequence (before the UI even shows up).
+The Power: APEX files can hold high-level code, native libraries, and even configuration files that the phone needs to "wake up."
+
+The below table only lists those modules that have been documented officially by Google. Google only documents modules as part of Project Mainline when they become updatable — certain modules like ART were originally packaged as non-updateable APEX files.
+
+Table : Android’s Project Mainline modules (Source: Android Internals, Volume II, Chapter I)
+
+AdServices	com.android.adservices	APEX	Android 13	Privacy Sandbox features
+adbd	com.android.adbd	APEX	Android 11	Android Debug Bridge support
+AppSearch	com.android.appsearch	APEX	Android 13	AppSearch, an on-device indexing and structured search engine
+ART	com.android.art	APEX	Android 12	Android Runtime (ART) and managed core library (libcore)
+Bluetooth	com.android.bluetooth	APEX	Android 13	Bluetooth stack
+Captive Portal Login	com.android.captiveportallogin	APK	Android 10	Captive Portal and Internet connectivity detection
+CellBroadcast	com.android.cellbroadcast	APEX	Android 11	Cellular emergency alerts
+Conscrypt	com.android.conscrypt	APEX	Android 10	Android TLS and cryptographic functionality
+Device Scheduling	com.android.scheduling	APEX	Android 12	Determine reboot readiness
+DNS Resolver	com.android.resolv	APEX	Android 10	DNS services (used by netd)
+DocumentsUI	com.android.documentsui	APK	Android 10	Documents picker for SAF
+ExtServices	com.android.ext.services	APK (Android 10), APEX (Android 11)	Android 10	Miscellaneous component logic support
+IPsec	com.android.ipsec	APEX	Android 11	IKE[v2] support
+Media Codecs	com.android.media.swcodec	APEX	Android 10	Software codecs and media format support
+Media	com.android.media	APEX	Android 10	Media extractors, MediaSession2 API, MediaParser APIs, and media transcoding
+MediaProvider	com.android.mediaprovider	APEX	Android 11	MediaStore collections
+ModuleMetadata	com.android.modulemetadata	APK	Android 10	Contains metadata about the installed modules
+Network Stack Permission Configuration	com.android.networkstack.permissionconfig	APK	Android 10	Empty module to define MAINLINE_NETWORK_STACK permission
+Network Components	com.android.networkstack	APK	Android 10	Network stack components
+NNAPI Runtime	com.android.neuralnetworks	APK	Android 11	Updates to the Neural Network Runtime library
+OnDevicePersonalization	com.android.ondevicepersonalization	APEX	Android 13	Simplify development of apps using user-data in a privacy-preserving way
+Permission	com.android.permission	APK (Android 10), APEX (Android 11)	Android 10	Runtime permission controller and Safety Center
+SDK Extensions	com.android.sdkext	APEX	Android 11	Determines SDK extension level and provides APIs to query it
+Statsd	com.android.os.statsd	APEX	Android 11	statsd, a native service that collects metrics
+Tethering	com.android.tethering	APK	Android 11	Tethering support, CrossDevice
+Time Zone Data	com.android.tzdata[1-4]	APEX	Android 10	Standardizes time zone data and how it’s updated
+UWB Zone Data	com.android.uwb	APEX	Android 13	Ultra-Wideband stack
+Wi-Fi	com.android.wifi	APEX	Android 11	Wi-Fi provider
