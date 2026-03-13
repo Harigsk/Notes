@@ -1,0 +1,157 @@
+PROCESS SANDBOXING
+As we know, Android is built on the Linux Kernel, and it uses standard Linux security features to create the sandbox.
+
+How do they communicate?
+Because they are in separate "boxes," they cannot share memory directly. They use Inter-Process Communication (IPC).
+
+So It doesn't use the traditional LINUX IPC Mechanism because they have significant shortcomings and cannot meet Android's Requirement.
+
+So, Android uses BINDER  IPC Mechanism to fulfill its Security, Memory Mapping
+
+BINDER INTRODUCTION
+Binder is the core inter-process communication (IPC) mechanism in the Android system, and it is also a complete "communication framework" - it not only solves the problem of communication isolation between processes,
+Also provides capabilities such as security verification, service management, and ease of use encapsulation. It is the foundation for cross-process collaboration of Android components (such as Activity, Service, and Content Provider)
+Binder can be defined in different ways depending on the perspective:
+
+At Mechanism Level: Efficient and Secure IPC
+At Driver Level: It is a linux  driver device (/dev/binder), which acts as a bridge between KERNEL and USER Space
+At Framework Level: Skeleton of the Android System, connecting  the Client, Server, Service Manager, and Binder Driver
+At Code Level: It is a IBinderClass that implements the interface
+
+Traditional Linux IPC vs BINDER IPC
+NATIVE IPC	SHORT COMING	BINDER ADVANTAGES
+SOCKET	Inefficient (2 data copies) and lack of security verfication	One-time copy, built-in UID/PID identity Verification
+Shared Memory	No Synchronization mechanism; Security issue requires mutual handling	Based on a client/server Architecture, it naturally supports synchronization and is secure and controllable
+Pipes/ Message Queues	Data Volume limitations, low efficiency, and lack of securtiy checks	Support Large data transfer, high efficiency, and controllable permissions
+
+BINDER Core Components
+The core of Binder mechanism consists of 4 components, which runs in user space and kernel space respectively and work together to complete cross-process communication.
+
+It involves 4 core roles:
+
+Client: The party that requests the service.
+Server: Provides Services(Such as System Service, AMS or Custom Process)
+Service Manager: Service Registration and Query Center manages the registration of all servers and queries of clients.
+Binder Driver: The Middleman at the Kernel level, responsible for IPC data forwarding, memory mapping and identity verification.
+
+
+HOW IPC Communication Happens
+
+Binder 's core advantage lies in its One-time-copy mechanims, which relies on Linux's mmap memory mapping mechanism
+
+The Process is as follows:
+
+The Client Initiates a Request: The client calls the target Method through the "binderProxy" object and writes the request Parameter  into user space Buffer
+The binder driver intercepts and maps the memory: It intercepts the request by mmap mapping the client's userspace buffer and the servers userspace buffer
+to the same physical memory.
+Server-Side Request Processing: The Server reads the parameters from mapped Memory, executes the target Method, and writes the result back to that memory.
+Client Retrieves Result: The client reads the result returned by server from its own userspace buffer, thus completing communication
+
+BINDER ARCHITECTURE LAYERING:
+Binder is implemented in layers (from kernel to applications), with each layer having clear responsiblity:
+
+Kernel Layer	Binder Driver (/dev/binder)	Memory Mapping, data forwarding, identity verification and reference management
+Native Layer	  BBinder (Server Side)
+  BPBinder (Client Side)	The C++ layer binder Implementation provides cross-process platform
+Framework Layer 	Binder Classes
+IBinder Interfaces, AIDL Tools	Java layer encapsulation simplifies developer use
+Application Layer 	Custom Service, Client Call Code 	Implement business logic using Framework layer API
+
+IBinder This is the Key top-level Interface for all binder objects defining the core methods for cross-process communication:
+
+transact
+ontransact()
+linkToDeath / unlinkToDeath: Listeners for the server crash (Server Notification)
+
+
+Deconstructing Binder:   
+
+To understand Binder IPC, you must grasp the four pillars that form the complete chain from interface definition to kernel execution.
+
+IBinder (The Protocol):
+Role: The top-level interface for all Binder communication.
+Logic: It defines the "rules of the game." It contains two critical methods: transact() (for the caller) and onTransact() (for the receiver).
+Analogy: It's the standard contract that both the Client and Server agree to sign.
+
+
+BBinder (The Service Implementation):
+Location: Server Process.
+Role: The actual service object. It inherits from IBinder and implements onTransact().
+Logic: It receives the data from the Driver, unmarshals it, performs the actual work (e.g., adding two numbers), and writes the result back.
+
+
+BpBinder (The Proxy):
+Location: Client Process.
+Role: The "Remote Proxy" for the service. It also inherits from IBinder but implements transact().
+Logic: It doesn't know how to do the work; it only knows the handle (an ID) of the remote service and how to talk to the Binder Driver.
+
+
+Binder Driver (The Bridge):
+Location: Kernel Space.
+Role: The middleman that breaks the process isolation barrier.
+Key Tech: mmap (Zero-copy/One-copy). It maps the memory of both processes so data is copied only once from the sender to the receiver's space.
+
+
+Section 2: Deep Dive into BpBinder::transact
+When a client calls a method on a proxy (e.g., service->add(1, 2)), it eventually calls BpBinder::transact().
+Handle-based Addressing: Every BpBinder stores an integer called m_handle. This isn't a memory address; it's a virtual ID assigned by the Driver that points to a specific service in another process.
+The Marshalling Process:
+The high-level data (integers, strings) is packed into a Parcel.
+BpBinder calls the ioctl() system call on the /dev/binder device file.
+Context Switch: At this point, the thread in the Client process enters the Kernel and blocks, waiting for a reply.
+
+
+Section 3: The Kernel and BBinder Hand-off
+Once the request hits the Binder Driver:
+
+Driver Translation: The Driver looks up the handle. It sees that Handle X belongs to Process Y (the Server).
+Memory Management: The Driver uses the pre-allocated memory (via mmap) to move the Parcel data into the Server's address space.
+Waking the Server: The Driver finds an idle thread in the Server's Binder thread pool and wakes it up.
+BBinder::onTransact(): * The Server thread calls the onTransact() method of the target BBinder.
+It reads the code (which method to call) and the data (parameters).
+
+It executes the logic and writes the result into the reply Parcel.
+
+
+Why Does Android Choose Binder?
+HIGH EFFICIENCY: MMAP single Data copy
+Security: Built-in UID/PID identity verification: server side access control prevents malicious calls
+Lightweight: The client/server architecture is simple and kernel consumes few resources
+
+AIDL:
+
+AIDL (Android Interface Definition Language) is Android's Interface, Primarily used solve IPC Problems.
+
+It allows components of different applications to communicate with each other in different process or we can say it acts as a bridge between 2 process defining the rules of Transmission of specific data
+AIDL Supports the following Data Types:
+Basic  Data Types (int, char, long, Boolean, double) the target tag is In/in by default and can only be in
+String or char sequence
+list: Only Array list is supported and array list must contain data types supported by AIDL
+map: Only HashMap is supported
+Parcelable: All objects that implements Parcelable Interface
+AIDL: All aidl files can be used
+Its Important to note that when declaring other data types you must specify Target Tag i.e. in (input parameter), out (Output parameter), inout (input/output parameter) Before them
+
+Its also important to note that, in addtion to the data types supported by AIDL, Other data types must be imported if we want to use them, even if the target file is in same package as the current file
+
+
+
+Ex: Suppose, you have 2 files Book.java/CPP and other is BOOKManager.aidl both located in the same package com.aidl.bookservice package, and you want to use the Book Object in the AIDL file
+
+you should write "import com.aidl.bookservice.Book" in BookManager.aidl file even if they are in same package
+
+
+TARGETED TAG:
+Its basically used in determining IPC Direction flow
+
+in (Input Parameter): CLIENT -> SERVER
+out (Output Parameter): Server -> CLIENT
+inout (input/output parameter) -> Bidirectional Flow
+
+
+AIDL BACKENDS:
+AIDL has the following backends:
+Java	Java	SDK or SystemApi (stable*)	All
+NDK	C++	libbinder_ndk (stable*)	aidl_interface
+CPP	C++	libbinder (unstable)	All
+Rust	Rust	libbinder_rs (stable*)	aidl_interface
